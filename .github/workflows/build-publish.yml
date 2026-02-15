@@ -1,4 +1,4 @@
-name: Build and Publish Distroless freebayes
+name: Build and Publish freebayes
 
 on:
   push:

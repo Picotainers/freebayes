@@ -1,5 +1,5 @@
 # freebayes
-Small, distroless-when-possible container for `freebayes`.
+Small compatibility-focused container for `freebayes`.
 
 ## how to use
 ```bash
