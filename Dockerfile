@@ -1,34 +1,64 @@
 # syntax=docker/dockerfile:1
-# Compatibility-first template for freebayes.
-# Installs package from Bioconda and copies the full conda runtime to avoid missing libs/interpreters.
 
-FROM mambaorg/micromamba:2.0.5-debian12-slim AS builder
+FROM debian:bookworm AS builder
+ARG FREEBAYES_VERSION=v1.3.10
 
-RUN micromamba install -y -n base -c conda-forge -c bioconda \
-    freebayes \
-    && micromamba clean --all --yes
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        cmake \
+        g++ \
+        git \
+        libfastahack-dev \
+        libhts-dev \
+        libseqlib-dev \
+        libsmithwaterman-dev \
+        libtabixpp-dev \
+        libvcflib-dev \
+        libwfa2-dev \
+        libbz2-dev \
+        liblzma-dev \
+        make \
+        meson \
+        ninja-build \
+        pkg-config \
+        python3 \
+        zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Resolve a runnable command for this package.
-# Prefer exact match, then underscore variant, then prefix match.
-RUN set -eux; \
-    BIN=""; \
-    if [ -x "/opt/conda/bin/freebayes" ]; then BIN="/opt/conda/bin/freebayes"; fi; \
-    if [ -z "$BIN" ]; then CAND="/opt/conda/bin/$(echo freebayes | tr '-' '_')"; [ -x "$CAND" ] && BIN="$CAND" || true; fi; \
-    if [ -z "$BIN" ]; then BIN="$(find /opt/conda/bin -maxdepth 1 -type f -perm -111 -name 'freebayes*' | head -n1 || true)"; fi; \
-    test -n "$BIN"; \
-    printf '%s\n' "$BIN" > /tmp/tool-entry-path
+WORKDIR /src
+RUN git clone --depth 1 --branch "${FREEBAYES_VERSION}" --recursive https://github.com/freebayes/freebayes.git
 
-FROM mambaorg/micromamba:2.0.5-debian12-slim
+WORKDIR /src/freebayes
+RUN meson setup build --buildtype release \
+    && ninja -C build \
+    && install -d /out/usr/local/bin \
+    && install -m755 build/freebayes /out/usr/local/bin/freebayes
 
-COPY --from=builder /opt/conda /opt/conda
-COPY --from=builder /tmp/tool-entry-path /tmp/tool-entry-path
+FROM debian:bookworm-slim
 
-USER root
-ENV PATH="/opt/conda/bin:${PATH}"
-ENV LD_LIBRARY_PATH="/opt/conda/lib:/opt/conda/lib64"
-RUN set -eux; \
-    BIN="$(cat /tmp/tool-entry-path)"; \
-    printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$BIN" > /usr/local/bin/freebayes
-RUN chmod +x /usr/local/bin/freebayes && rm -f /tmp/tool-entry-path
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        libbz2-1.0 \
+        libdisorder0 \
+        libfastahack0 \
+        libfml0 \
+        libhts3 \
+        libhtscodecs2 \
+        libjsoncpp25 \
+        liblzma5 \
+        libseqlib2 \
+        libsmithwaterman0 \
+        libssw0 \
+        libtabixpp0 \
+        libvcflib1 \
+        libwfa2-0 \
+        zlib1g \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /out/ /
+
 WORKDIR /data
 ENTRYPOINT ["/usr/local/bin/freebayes"]
+CMD ["--help"]

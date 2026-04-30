@@ -1,7 +1,12 @@
 # freebayes
-Small compatibility-focused container for `freebayes`.
+Container image for FreeBayes built from source.
 
-## how to use
+## Quick Usage
+
 ```bash
-docker run --rm -v "$(pwd):/data" picotainers/freebayes:latest --help
+# Pull the image
+docker pull docker.io/picotainers/freebayes:latest
+
+# Run the tool
+docker run --rm docker.io/picotainers/freebayes:latest freebayes --help
 ```
